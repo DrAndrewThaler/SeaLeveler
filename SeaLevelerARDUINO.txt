@@ -1,0 +1,86 @@
+#include <Stepper.h> //import the library for stepper motor
+#include <Ethernet.h> //import the library for ethernet shield
+#include <SPI.h> //import the library for communicating with serial devices
+
+const int STEPS = 200; //set the number of steps in step motor, becuase I have a dirt cheap step motor, this is determined by trial and error
+Stepper myStepper(STEPS,6,8,7,5); //creates the stepper class, defines number of steps in motor, and associates motor with pins (if you got the same cheap motor as me, you'll have to figure out the pin order by trial and error too)
+
+byte server[] = { XXX,XXX,XX,XX }; //input the ip Address for the server you want to connect to
+String location = "/~demo/demo.php HTTP/1.0"; //location of .php script on the server you're connecting to 
+byte mac[] = { 0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX }; // MAC address of your ethernet shield (written on bottom if you have the commercial arduino ethernet shield)
+EthernetClient client; //tells the microcontroller what you're calling the ethernet client
+
+char inString[32]; // string for incoming serial data
+int stringPos = 0; // string index counter
+boolean startRead = false; // checks if the ethernet shield is reading the website
+int Tweets; //number of tweets counter, converts character array inString to integer, starting at position 0
+int LastTweets = 0; //number of tweets from previous ping
+
+void setup(){ 
+  Ethernet.begin(mac); //power up that ethernet shield
+  Serial.begin(9600); //get your serial port going
+  myStepper.setSpeed(60); //speed of the stepper motor in RPM, nice and slow gives smooth curves
+}
+
+void loop(){
+
+  String pageValue = connectAndRead(); //connect to the server and read the output
+
+  Serial.println(pageValue); //print out the string, helpful for debugging
+  
+  Tweets = atoi(&inString[0]); //converts character array from pageValue to int
+  Serial.println(LastTweets); //prints the previous tweet count in the serial monitor, helpful for debugging
+  
+  myStepper.step(-STEPS*(Tweets-LastTweets)); //move the stepper a number of steps depending on the difference between current and last Tweet count
+  
+  LastTweets = Tweets; //resets LastTweets to current Tweet count
+  
+  delay(300000); //wait XXX milliseconds before connecting again
+}
+
+String connectAndRead(){ //connect to server
+
+  Serial.println("connecting...");
+
+  if (client.connect(server, 80)) {
+    Serial.println("connected");
+    client.print("GET ");
+    client.println(location);
+    client.println();
+
+    return readPage(); //return the output from the readPage string
+
+  }else{
+    return "connection failed";
+  }
+}
+
+String readPage(){  //read the page, return everything between '<' and '>'
+
+  stringPos = 0;
+  memset( &inString, 0, 32 );
+
+  while(true){
+
+    if (client.available()) {
+      char c = client.read();
+
+      if (c == '<' ) { 
+        startRead = true; 
+      }else if(startRead){
+
+        if(c != '>'){ 
+          inString[stringPos] = c;
+          stringPos ++;
+        }else{
+          startRead = false;
+          client.stop();
+          client.flush();
+          Serial.println("disconnecting.");
+          return inString; //return the output recorded between < and > to the connectAndRead string
+
+        }
+      }
+    }
+  }
+}
