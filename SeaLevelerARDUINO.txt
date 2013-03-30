@@ -2,19 +2,17 @@
 #include <Ethernet.h> //import the library for ethernet shield
 #include <SPI.h> //import the library for communicating with serial devices
 
-const int STEPS = 200; //set the number of steps in step motor, becuase I have a dirt cheap step motor, this is determined by trial and error
+const int STEPS = 384; //set the number of steps in step motor, because I have a dirt cheap step motor, this is determined by trial and error
 Stepper myStepper(STEPS,6,8,7,5); //creates the stepper class, defines number of steps in motor, and associates motor with pins (if you got the same cheap motor as me, you'll have to figure out the pin order by trial and error too)
 
 byte server[] = { XXX,XXX,XX,XX }; //input the ip Address for the server you want to connect to
-String location = "/~demo/demo.php HTTP/1.0"; //location of .php script on the server you're connecting to 
+String location = "/XXX/XXX.XXX HTTP/1.0"; //location of .php script on the server you're connecting to 
 byte mac[] = { 0xXX, 0xXX, 0xXX, 0xXX, 0xXX, 0xXX }; // MAC address of your ethernet shield (written on bottom if you have the commercial arduino ethernet shield)
 EthernetClient client; //tells the microcontroller what you're calling the ethernet client
 
 char inString[32]; // string for incoming serial data
 int stringPos = 0; // string index counter
 boolean startRead = false; // checks if the ethernet shield is reading the website
-int Tweets; //number of tweets counter, converts character array inString to integer, starting at position 0
-int LastTweets = 0; //number of tweets from previous ping
 
 void setup(){ 
   Ethernet.begin(mac); //power up that ethernet shield
@@ -23,19 +21,21 @@ void setup(){
 }
 
 void loop(){
-
+  static int LastTweets = 0; //number of tweets from previous ping
+  int Tweets = atoi(&inString[0]); //number of tweets counter, converts character array inString to integer
+  
   String pageValue = connectAndRead(); //connect to the server and read the output
 
   Serial.println(pageValue); //print out the string, helpful for debugging
   
-  Tweets = atoi(&inString[0]); //converts character array from pageValue to int
   Serial.println(LastTweets); //prints the previous tweet count in the serial monitor, helpful for debugging
   
-  myStepper.step(-STEPS*(Tweets-LastTweets)); //move the stepper a number of steps depending on the difference between current and last Tweet count
-  
-  LastTweets = Tweets; //resets LastTweets to current Tweet count
-  
-  delay(300000); //wait XXX milliseconds before connecting again
+  if(Tweets > 0) //prevents arm from returning to zero when no signal recieved
+  {
+    myStepper.step((-STEPS)*(4*(Tweets-LastTweets))); //move the stepper a number of steps depending on the difference between current and last Tweet count
+    LastTweets = Tweets; //resets LastTweets to current Tweet count
+    delay(90000); //wait XXX milliseconds before connecting again
+  }
 }
 
 String connectAndRead(){ //connect to server
